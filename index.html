@@ -87,6 +87,27 @@
   .dot.taken{ background: var(--coral); }
   .dot.now{ background: var(--amber); }
 
+  .week-nav{
+    display:flex;
+    gap:10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .btn-week{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor:pointer;
+  }
+  .btn-week:hover{ border-color: var(--teal); color: var(--teal); }
+  .btn-week-today{ background: var(--ink); color:#fff; border-color: var(--ink); }
+  .btn-week-today:hover{ background:#0F1730; color:#fff; }
+
   #status-banner{
     display:none;
     background: var(--surface);
@@ -275,7 +296,7 @@
   <header>
     <div>
       <div class="eyebrow">Sala de computación</div>
-      <h1>Horario semanal</h1>
+      <h1 id="titulo-semana">Horario semanal</h1>
       <p class="subtitle">Haz clic en una hora libre para reservarla con tu curso, o en una hora ocupada para liberarla.</p>
     </div>
     <div class="legend">
@@ -284,6 +305,12 @@
       <span><i class="dot now"></i> Bloque actual</span>
     </div>
   </header>
+
+  <div class="week-nav">
+    <button class="btn-week" onclick="cambiarSemana(-1)" aria-label="Semana anterior">← Semana anterior</button>
+    <button class="btn-week btn-week-today" onclick="irHoy()">Esta semana</button>
+    <button class="btn-week" onclick="cambiarSemana(1)" aria-label="Semana siguiente">Semana siguiente →</button>
+  </div>
 
   <div id="status-banner"></div>
 
@@ -339,7 +366,7 @@
 // =====================================================================
 
 // Pega aquí la URL /exec que te entrega Apps Script al implementar Code.gs
-const API_URL = 'https://script.google.com/macros/s/AKfycbzU0uomVR1Zou7_LDO_D1qagsF054QNyFSwNjCpBZL_eLnF2RhJbuYt-9LaBe8SN8W96A/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbye3fjiXhgPt4KXPHLYBKneRvrBYOPxSXVFsL2dBmW0ufoKr4jdPs9-cA4mvRI8DmLK_Q/exec';
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 
@@ -357,14 +384,60 @@ const BLOQUES = [
 
 // =====================================================================
 
-let reservas = {}; // clave "Dia-Bloque" -> {curso, profesor}
-let slotSeleccionado = null;
+const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
-function claveSlot(dia, bloque){ return dia + '-' + bloque; }
+let reservas = {}; // clave "FechaISO-Bloque" -> {curso, profesor, dia}
+let slotSeleccionado = null; // {fecha, dia, bloque}
+let semanaSeleccionada = lunesDe(new Date()); // Date — lunes de la semana que se muestra
 
-function diaDeHoy(){
-  const idx = new Date().getDay(); // 0=domingo
-  return DIAS[idx - 1] || null; // null si es fin de semana
+function claveSlot(fechaISO, bloque){ return fechaISO + '-' + bloque; }
+
+function lunesDe(fecha){
+  const d = new Date(fecha);
+  const dow = d.getDay(); // 0=domingo..6=sábado
+  const offset = dow === 0 ? -6 : 1 - dow; // retrocede hasta el lunes
+  d.setDate(d.getDate() + offset);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function toISO(fecha){
+  const y = fecha.getFullYear();
+  const m = String(fecha.getMonth() + 1).padStart(2, '0');
+  const d = String(fecha.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function fechasSemana(lunes){
+  return DIAS.map((_, i) => {
+    const f = new Date(lunes);
+    f.setDate(f.getDate() + i);
+    return f;
+  });
+}
+
+function formatearRangoSemana(lunes){
+  const dias = fechasSemana(lunes);
+  const inicio = dias[0], fin = dias[4];
+  if (inicio.getMonth() === fin.getMonth()) {
+    return `Semana del ${inicio.getDate()} al ${fin.getDate()} de ${MESES[inicio.getMonth()]}`;
+  }
+  if (inicio.getFullYear() === fin.getFullYear()) {
+    return `Semana del ${inicio.getDate()} de ${MESES[inicio.getMonth()]} al ${fin.getDate()} de ${MESES[fin.getMonth()]}`;
+  }
+  return `Semana del ${inicio.getDate()} de ${MESES[inicio.getMonth()]} de ${inicio.getFullYear()} al ${fin.getDate()} de ${MESES[fin.getMonth()]} de ${fin.getFullYear()}`;
+}
+
+function cambiarSemana(delta){
+  const nueva = new Date(semanaSeleccionada);
+  nueva.setDate(nueva.getDate() + delta * 7);
+  semanaSeleccionada = nueva;
+  cargarReservas();
+}
+
+function irHoy(){
+  semanaSeleccionada = lunesDe(new Date());
+  cargarReservas();
 }
 
 function bloqueActual(){
@@ -388,13 +461,15 @@ function mostrarBanner(msg, esError){
 }
 
 async function cargarReservas(){
+  document.getElementById('titulo-semana').textContent = formatearRangoSemana(semanaSeleccionada);
   try {
-    const res = await fetch(API_URL);
+    const url = API_URL + '?semana=' + toISO(semanaSeleccionada);
+    const res = await fetch(url);
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || 'Error desconocido');
     reservas = {};
     data.reservas.forEach(r => {
-      reservas[claveSlot(r.dia, r.bloque)] = { curso: r.curso, profesor: r.profesor };
+      reservas[claveSlot(r.fecha, r.bloque)] = { curso: r.curso, profesor: r.profesor, dia: r.dia };
     });
     dibujarTablero();
   } catch (err) {
@@ -403,32 +478,35 @@ async function cargarReservas(){
 }
 
 function dibujarTablero(){
-  const hoy = diaDeHoy();
+  const hoyISO = toISO(new Date());
   const bloqueHoy = bloqueActual();
+  const dias = fechasSemana(semanaSeleccionada);
 
   const table = document.getElementById('board');
   let html = '<thead><tr><th></th>';
-  DIAS.forEach(d => {
-    html += `<th class="day-header ${d === hoy ? 'today' : ''}">${d}</th>`;
+  dias.forEach((f, i) => {
+    const esHoy = toISO(f) === hoyISO;
+    html += `<th class="day-header ${esHoy ? 'today' : ''}">${DIAS[i]}<br><span style="font-weight:500;font-size:12px;">${f.getDate()} ${MESES[f.getMonth()].slice(0,3)}</span></th>`;
   });
   html += '</tr></thead><tbody>';
 
   BLOQUES.forEach(b => {
     html += `<tr><td class="block-label"><b>Bloque ${b.n}</b>${b.inicio}–${b.fin}</td>`;
-    DIAS.forEach(d => {
-      const key = claveSlot(d, b.n);
+    dias.forEach((f, i) => {
+      const fechaISO = toISO(f);
+      const key = claveSlot(fechaISO, b.n);
       const ocupado = reservas[key];
-      const esAhora = (d === hoy && b.n === bloqueHoy);
+      const esAhora = (fechaISO === hoyISO && b.n === bloqueHoy);
       if (ocupado) {
         html += `<td>
-          <div class="cell taken ${esAhora ? 'now-col' : ''}" onclick="abrirLiberar('${d}', ${b.n})">
+          <div class="cell taken ${esAhora ? 'now-col' : ''}" onclick="abrirLiberar('${fechaISO}', '${DIAS[i]}', ${b.n})">
             <div class="curso">${escapeHtml(ocupado.curso)}</div>
             <div class="prof">${escapeHtml(ocupado.profesor)}</div>
           </div>
         </td>`;
       } else {
         html += `<td>
-          <div class="cell ${esAhora ? 'now-col' : ''}" onclick="abrirReservar('${d}', ${b.n})">
+          <div class="cell ${esAhora ? 'now-col' : ''}" onclick="abrirReservar('${fechaISO}', '${DIAS[i]}', ${b.n})">
             <div class="free-txt">Libre</div>
           </div>
         </td>`;
@@ -449,23 +527,23 @@ function escapeHtml(str){
 
 function bloqueInfo(n){ return BLOQUES.find(b => b.n === n); }
 
-function abrirReservar(dia, bloque){
-  slotSeleccionado = { dia, bloque };
+function abrirReservar(fecha, dia, bloque){
+  slotSeleccionado = { fecha, dia, bloque };
   const info = bloqueInfo(bloque);
   document.getElementById('reservar-slot').textContent =
-    `${dia} · Bloque ${bloque} · ${info.inicio}–${info.fin}`;
+    `${dia} ${fecha.split('-').reverse().slice(0,2).join('/')} · Bloque ${bloque} · ${info.inicio}–${info.fin}`;
   document.getElementById('input-curso').value = '';
   document.getElementById('input-profesor-reserva').value = '';
   document.getElementById('error-reservar').className = 'modal-error';
   document.getElementById('overlay-reservar').classList.add('show');
 }
 
-function abrirLiberar(dia, bloque){
-  slotSeleccionado = { dia, bloque };
+function abrirLiberar(fecha, dia, bloque){
+  slotSeleccionado = { fecha, dia, bloque };
   const info = bloqueInfo(bloque);
-  const r = reservas[claveSlot(dia, bloque)];
+  const r = reservas[claveSlot(fecha, bloque)];
   document.getElementById('liberar-slot').textContent =
-    `${dia} · Bloque ${bloque} · ${info.inicio}–${info.fin} · Reservado por ${r.profesor} (${r.curso})`;
+    `${dia} ${fecha.split('-').reverse().slice(0,2).join('/')} · Bloque ${bloque} · ${info.inicio}–${info.fin} · Reservado por ${r.profesor} (${r.curso})`;
   document.getElementById('input-profesor-liberar').value = '';
   document.getElementById('error-liberar').className = 'modal-error';
   document.getElementById('overlay-liberar').classList.add('show');
@@ -500,6 +578,7 @@ async function confirmarReserva(){
 
   const info = bloqueInfo(slotSeleccionado.bloque);
   const payload = {
+    fecha: slotSeleccionado.fecha,
     dia: slotSeleccionado.dia,
     bloque: slotSeleccionado.bloque,
     horaInicio: info.inicio,
@@ -535,6 +614,7 @@ async function confirmarCancelacion(){
 
   const payload = {
     accion: 'cancelar',
+    fecha: slotSeleccionado.fecha,
     dia: slotSeleccionado.dia,
     bloque: slotSeleccionado.bloque,
     profesor
