@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sala de Computación · Horario</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #F2F5F9;
+    --surface: #FFFFFF;
+    --ink: #16213E;
+    --ink-soft: #5B6785;
+    --border: #DCE3EC;
+    --teal: #0EA5A0;
+    --teal-soft: #E3F6F4;
+    --coral: #E4572E;
+    --coral-soft: #FCEAE3;
+    --amber: #F4A300;
+    --radius: 14px;
+    --shadow: 0 2px 10px rgba(22,33,62,0.06), 0 10px 30px rgba(22,33,62,0.04);
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(22,33,62,0.05) 1px, transparent 0);
+    background-size: 22px 22px;
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height:100vh;
+    padding: 28px 20px 60px;
+  }
+
+  .wrap{ max-width: 1180px; margin: 0 auto; }
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    font-weight: 600;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .eyebrow::before{
+    content:'';
+    width:8px; height:8px; border-radius:2px;
+    background: var(--teal);
+    display:inline-block;
+  }
+
+  h1{
+    font-family:'Sora', sans-serif;
+    font-weight: 800;
+    font-size: clamp(28px, 4vw, 38px);
+    margin: 6px 0 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .subtitle{ color: var(--ink-soft); font-size:15px; max-width: 520px; }
+
+  .legend{
+    display:flex; gap:18px; flex-wrap:wrap;
+    font-size: 13px; color: var(--ink-soft);
+    font-family:'JetBrains Mono', monospace;
+  }
+  .legend span{ display:flex; align-items:center; gap:7px; }
+  .dot{ width:11px; height:11px; border-radius:3px; display:inline-block; }
+  .dot.free{ background: var(--teal); }
+  .dot.taken{ background: var(--coral); }
+  .dot.now{ background: var(--amber); }
+
+  #status-banner{
+    display:none;
+    background: var(--surface);
+    border:1px solid var(--border);
+    border-left: 4px solid var(--teal);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 14px;
+    margin-bottom: 18px;
+  }
+  #status-banner.error{ border-left-color: var(--coral); color:#9A3412; }
+  #status-banner.show{ display:block; }
+
+  .board-shell{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 6px;
+    overflow-x: auto;
+  }
+
+  table.board{
+    border-collapse: separate;
+    border-spacing: 6px;
+    width: 100%;
+    min-width: 760px;
+  }
+
+  table.board th{
+    font-family:'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 14.5px;
+    color: var(--ink);
+    padding: 10px 6px;
+    text-align:center;
+  }
+
+  table.board th.day-header.today{ color: var(--teal); }
+
+  td.block-label{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align:right;
+    padding-right: 10px;
+    white-space: nowrap;
+    width: 90px;
+  }
+  td.block-label b{
+    display:block; color: var(--ink); font-size: 13.5px;
+  }
+
+  .cell{
+    border-radius: 10px;
+    min-height: 64px;
+    padding: 8px 10px;
+    cursor: pointer;
+    border: 1.5px dashed var(--teal);
+    background: var(--teal-soft);
+    transition: transform .08s ease, box-shadow .08s ease;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:2px;
+  }
+  .cell:hover{ transform: translateY(-1px); box-shadow: 0 4px 14px rgba(14,165,160,0.18); }
+
+  .cell.taken{
+    cursor:pointer;
+    border: 1.5px solid var(--coral);
+    background: var(--coral-soft);
+  }
+  .cell.taken:hover{ box-shadow: 0 4px 14px rgba(228,87,46,0.18); }
+
+  .cell .free-txt{
+    font-size: 12.5px;
+    color: var(--teal);
+    font-weight: 600;
+    font-family:'JetBrains Mono', monospace;
+  }
+  .cell .curso{
+    font-family:'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 13.5px;
+    color: #9A2E14;
+  }
+  .cell .prof{
+    font-size: 11.5px;
+    color: #A64B2A;
+  }
+
+  .cell.now-col{ outline: 2px solid var(--amber); outline-offset: -2px; }
+
+  /* Modal */
+  .overlay{
+    display:none;
+    position: fixed; inset:0;
+    background: rgba(22,33,62,0.45);
+    align-items:center; justify-content:center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .overlay.show{ display:flex; }
+
+  .modal{
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 26px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 20px 60px rgba(22,33,62,0.25);
+  }
+  .modal h2{
+    font-family:'Sora', sans-serif;
+    font-size: 19px;
+    margin: 0 0 4px;
+  }
+  .modal .modal-slot{
+    font-family:'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 18px;
+  }
+  .modal label{
+    display:block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    margin: 14px 0 6px;
+  }
+  .modal input{
+    width:100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    font-family:'Inter', sans-serif;
+    font-size: 14.5px;
+  }
+  .modal input:focus{ outline: 2px solid var(--teal); border-color: var(--teal); }
+
+  .modal-actions{
+    display:flex; gap: 10px;
+    margin-top: 22px;
+  }
+  .btn{
+    flex:1;
+    padding: 11px 14px;
+    border-radius: 9px;
+    border: none;
+    font-family:'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor:pointer;
+  }
+  .btn-primary{ background: var(--ink); color:#fff; }
+  .btn-primary:hover{ background:#0F1730; }
+  .btn-danger{ background: var(--coral); color:#fff; }
+  .btn-danger:hover{ background:#C64A26; }
+  .btn-ghost{ background: transparent; color: var(--ink-soft); border:1.5px solid var(--border); }
+  .btn-ghost:hover{ background: var(--bg); }
+
+  .modal-error{
+    display:none;
+    background: var(--coral-soft);
+    color:#9A3412;
+    border-radius:8px;
+    padding: 9px 11px;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .modal-error.show{ display:block; }
+
+  footer{
+    text-align:center;
+    color: var(--ink-soft);
+    font-size: 12.5px;
+    margin-top: 26px;
+    font-family:'JetBrains Mono', monospace;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Sala de computación</div>
+      <h1>Horario semanal</h1>
+      <p class="subtitle">Haz clic en una hora libre para reservarla con tu curso, o en una hora ocupada para liberarla.</p>
+    </div>
+    <div class="legend">
+      <span><i class="dot free"></i> Disponible</span>
+      <span><i class="dot taken"></i> Reservada</span>
+      <span><i class="dot now"></i> Bloque actual</span>
+    </div>
+  </header>
+
+  <div id="status-banner"></div>
+
+  <div class="board-shell">
+    <table class="board" id="board"></table>
+  </div>
+
+  <footer>Los cambios se guardan directo en la planilla de Google Sheets del colegio.</footer>
+</div>
+
+<!-- Modal reservar -->
+<div class="overlay" id="overlay-reservar">
+  <div class="modal">
+    <h2>Reservar hora</h2>
+    <div class="modal-slot" id="reservar-slot"></div>
+
+    <label for="input-curso">Curso que viene</label>
+    <input type="text" id="input-curso" placeholder="Ej: 3° Básico A" />
+
+    <label for="input-profesor-reserva">Tu nombre</label>
+    <input type="text" id="input-profesor-reserva" placeholder="Ej: Profesora Ana Soto" />
+
+    <div class="modal-error" id="error-reservar"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="cerrarModales()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarReserva()">Reservar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal liberar -->
+<div class="overlay" id="overlay-liberar">
+  <div class="modal">
+    <h2>Liberar hora</h2>
+    <div class="modal-slot" id="liberar-slot"></div>
+
+    <label for="input-profesor-liberar">Escribe tu nombre para confirmar</label>
+    <input type="text" id="input-profesor-liberar" placeholder="Debe coincidir con quien reservó" />
+
+    <div class="modal-error" id="error-liberar"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="cerrarModales()">Volver</button>
+      <button class="btn btn-danger" onclick="confirmarCancelacion()">Liberar hora</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// CONFIGURACIÓN — ajusta esto a la realidad de tu colegio
+// =====================================================================
+
+// Pega aquí la URL /exec que te entrega Apps Script al implementar Code.gs
+const API_URL = 'PEGA_AQUI_TU_URL_DE_APPS_SCRIPT';
+
+const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+// Bloques horarios de 45 min — edita horas/cantidad según el horario real
+const BLOQUES = [
+  { n: 1, inicio: '08:00', fin: '08:45' },
+  { n: 2, inicio: '08:45', fin: '09:30' },
+  { n: 3, inicio: '09:45', fin: '10:30' },
+  { n: 4, inicio: '10:30', fin: '11:15' },
+  { n: 5, inicio: '11:30', fin: '12:15' },
+  { n: 6, inicio: '12:15', fin: '13:00' },
+  { n: 7, inicio: '14:00', fin: '14:45' },
+  { n: 8, inicio: '14:45', fin: '15:30' },
+];
+
+// =====================================================================
+
+let reservas = {}; // clave "Dia-Bloque" -> {curso, profesor}
+let slotSeleccionado = null;
+
+function claveSlot(dia, bloque){ return dia + '-' + bloque; }
+
+function diaDeHoy(){
+  const idx = new Date().getDay(); // 0=domingo
+  return DIAS[idx - 1] || null; // null si es fin de semana
+}
+
+function bloqueActual(){
+  const ahora = new Date();
+  const mins = ahora.getHours() * 60 + ahora.getMinutes();
+  for (const b of BLOQUES) {
+    const [hi, mi] = b.inicio.split(':').map(Number);
+    const [hf, mf] = b.fin.split(':').map(Number);
+    const inicioMin = hi * 60 + mi, finMin = hf * 60 + mf;
+    if (mins >= inicioMin && mins < finMin) return b.n;
+  }
+  return null;
+}
+
+function mostrarBanner(msg, esError){
+  const el = document.getElementById('status-banner');
+  el.textContent = msg;
+  el.className = 'show' + (esError ? ' error' : '');
+  clearTimeout(window._bannerTimeout);
+  window._bannerTimeout = setTimeout(() => { el.className = ''; }, 4500);
+}
+
+async function cargarReservas(){
+  try {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error desconocido');
+    reservas = {};
+    data.reservas.forEach(r => {
+      reservas[claveSlot(r.dia, r.bloque)] = { curso: r.curso, profesor: r.profesor };
+    });
+    dibujarTablero();
+  } catch (err) {
+    mostrarBanner('No se pudo cargar el horario. Revisa la conexión o la URL de la API. (' + err.message + ')', true);
+  }
+}
+
+function dibujarTablero(){
+  const hoy = diaDeHoy();
+  const bloqueHoy = bloqueActual();
+
+  const table = document.getElementById('board');
+  let html = '<thead><tr><th></th>';
+  DIAS.forEach(d => {
+    html += `<th class="day-header ${d === hoy ? 'today' : ''}">${d}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  BLOQUES.forEach(b => {
+    html += `<tr><td class="block-label"><b>Bloque ${b.n}</b>${b.inicio}–${b.fin}</td>`;
+    DIAS.forEach(d => {
+      const key = claveSlot(d, b.n);
+      const ocupado = reservas[key];
+      const esAhora = (d === hoy && b.n === bloqueHoy);
+      if (ocupado) {
+        html += `<td>
+          <div class="cell taken ${esAhora ? 'now-col' : ''}" onclick="abrirLiberar('${d}', ${b.n})">
+            <div class="curso">${escapeHtml(ocupado.curso)}</div>
+            <div class="prof">${escapeHtml(ocupado.profesor)}</div>
+          </div>
+        </td>`;
+      } else {
+        html += `<td>
+          <div class="cell ${esAhora ? 'now-col' : ''}" onclick="abrirReservar('${d}', ${b.n})">
+            <div class="free-txt">Libre</div>
+          </div>
+        </td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function bloqueInfo(n){ return BLOQUES.find(b => b.n === n); }
+
+function abrirReservar(dia, bloque){
+  slotSeleccionado = { dia, bloque };
+  const info = bloqueInfo(bloque);
+  document.getElementById('reservar-slot').textContent =
+    `${dia} · Bloque ${bloque} · ${info.inicio}–${info.fin}`;
+  document.getElementById('input-curso').value = '';
+  document.getElementById('input-profesor-reserva').value = '';
+  document.getElementById('error-reservar').className = 'modal-error';
+  document.getElementById('overlay-reservar').classList.add('show');
+}
+
+function abrirLiberar(dia, bloque){
+  slotSeleccionado = { dia, bloque };
+  const info = bloqueInfo(bloque);
+  const r = reservas[claveSlot(dia, bloque)];
+  document.getElementById('liberar-slot').textContent =
+    `${dia} · Bloque ${bloque} · ${info.inicio}–${info.fin} · Reservado por ${r.profesor} (${r.curso})`;
+  document.getElementById('input-profesor-liberar').value = '';
+  document.getElementById('error-liberar').className = 'modal-error';
+  document.getElementById('overlay-liberar').classList.add('show');
+}
+
+function cerrarModales(){
+  document.getElementById('overlay-reservar').classList.remove('show');
+  document.getElementById('overlay-liberar').classList.remove('show');
+  slotSeleccionado = null;
+}
+
+async function enviarPost(payload){
+  // Content-Type text/plain evita el preflight CORS que Apps Script no maneja bien
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+async function confirmarReserva(){
+  const curso = document.getElementById('input-curso').value.trim();
+  const profesor = document.getElementById('input-profesor-reserva').value.trim();
+  const errorEl = document.getElementById('error-reservar');
+
+  if (!curso || !profesor) {
+    errorEl.textContent = 'Completa el curso y tu nombre.';
+    errorEl.className = 'modal-error show';
+    return;
+  }
+
+  const info = bloqueInfo(slotSeleccionado.bloque);
+  const payload = {
+    dia: slotSeleccionado.dia,
+    bloque: slotSeleccionado.bloque,
+    horaInicio: info.inicio,
+    horaFin: info.fin,
+    curso, profesor
+  };
+
+  try {
+    const data = await enviarPost(payload);
+    if (!data.ok) {
+      errorEl.textContent = data.error || 'No se pudo reservar.';
+      errorEl.className = 'modal-error show';
+      return;
+    }
+    cerrarModales();
+    mostrarBanner('Hora reservada correctamente para ' + curso + '.', false);
+    cargarReservas();
+  } catch (err) {
+    errorEl.textContent = 'Error de conexión. Intenta de nuevo.';
+    errorEl.className = 'modal-error show';
+  }
+}
+
+async function confirmarCancelacion(){
+  const profesor = document.getElementById('input-profesor-liberar').value.trim();
+  const errorEl = document.getElementById('error-liberar');
+
+  if (!profesor) {
+    errorEl.textContent = 'Escribe tu nombre.';
+    errorEl.className = 'modal-error show';
+    return;
+  }
+
+  const payload = {
+    accion: 'cancelar',
+    dia: slotSeleccionado.dia,
+    bloque: slotSeleccionado.bloque,
+    profesor
+  };
+
+  try {
+    const data = await enviarPost(payload);
+    if (!data.ok) {
+      errorEl.textContent = data.error || 'No se pudo liberar la hora.';
+      errorEl.className = 'modal-error show';
+      return;
+    }
+    cerrarModales();
+    mostrarBanner('Hora liberada.', false);
+    cargarReservas();
+  } catch (err) {
+    errorEl.textContent = 'Error de conexión. Intenta de nuevo.';
+    errorEl.className = 'modal-error show';
+  }
+}
+
+document.querySelectorAll('.overlay').forEach(ov => {
+  ov.addEventListener('click', (e) => { if (e.target === ov) cerrarModales(); });
+});
+
+cargarReservas();
+setInterval(cargarReservas, 30000); // refresca cada 30s por si otro profe reserva
+</script>
+
+</body>
+</html>
