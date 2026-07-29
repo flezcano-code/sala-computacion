@@ -257,6 +257,41 @@
 
   .cell.now-col{ outline: 2px solid var(--amber); outline-offset: -2px; }
 
+  .cell.selected{
+    border: 2px solid var(--ink);
+    background: #DCE7FF;
+    box-shadow: 0 4px 14px rgba(22,33,62,0.18);
+  }
+  .cell.selected .free-txt{ color: var(--ink); }
+  .cell.selected .free-txt::before{ content: '✓ '; }
+
+  .cell.taken{ cursor: default; }
+  .cell.taken:hover{ box-shadow: none; transform:none; }
+
+  .selection-bar{
+    display:none;
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    background: var(--ink);
+    color:#fff;
+    border-radius: 12px;
+    padding: 12px 14px 12px 20px;
+    box-shadow: 0 12px 30px rgba(22,33,62,0.35);
+    align-items:center;
+    gap: 18px;
+    z-index: 40;
+    font-family:'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .selection-bar.show{ display:flex; }
+  .selection-bar-actions{ display:flex; gap: 8px; }
+  .selection-bar .btn{ flex: none; padding: 9px 14px; font-size:13px; }
+  .selection-bar .btn-ghost{ color:#fff; border-color: rgba(255,255,255,0.35); }
+  .selection-bar .btn-ghost:hover{ background: rgba(255,255,255,0.1); }
+
   /* Modal */
   .overlay{
     display:none;
@@ -369,10 +404,19 @@
   </div>
 </div>
 
+<!-- Barra flotante de selección -->
+<div class="selection-bar" id="selection-bar">
+  <span id="selection-count">0 horas seleccionadas</span>
+  <div class="selection-bar-actions">
+    <button class="btn btn-ghost" onclick="limpiarSeleccion()">Limpiar</button>
+    <button class="btn btn-primary" onclick="abrirReservar()">Reservar seleccionadas</button>
+  </div>
+</div>
+
 <!-- Modal reservar -->
 <div class="overlay" id="overlay-reservar">
   <div class="modal">
-    <h2>Reservar hora</h2>
+    <h2>Reservar horas</h2>
     <div class="modal-slot" id="reservar-slot"></div>
 
     <label for="input-curso">Curso que viene</label>
@@ -390,28 +434,11 @@
   </div>
 </div>
 
-<!-- Modal liberar -->
-<div class="overlay" id="overlay-liberar">
-  <div class="modal">
-    <h2>Liberar hora</h2>
-    <div class="modal-slot" id="liberar-slot"></div>
-
-    <label for="input-profesor-liberar">Escribe tu nombre para confirmar</label>
-    <input type="text" id="input-profesor-liberar" placeholder="Debe coincidir con quien reservó" />
-
-    <div class="modal-error" id="error-liberar"></div>
-
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="cerrarModales()">Volver</button>
-      <button class="btn btn-danger" onclick="confirmarCancelacion()">Liberar hora</button>
-    </div>
-  </div>
-</div>
-
 <script>
 // =====================================================================
 // CONFIGURACIÓN — ajusta esto a la realidad de tu colegio
 // =====================================================================
+
 
 // Pega aquí la URL /exec que te entrega Apps Script al implementar Code.gs
 const API_URL = 'https://script.google.com/macros/s/AKfycbztMRpD4Z4iiZDBCE9J_94uTXqvUd_wqupDVa44fPZ7zT1PaewKnjXTusL1KdA1soxmXA/exec';
@@ -444,7 +471,7 @@ const BLOQUES = [
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 let reservas = {}; // clave "FechaISO-Bloque" -> {curso, profesor, dia}
-let slotSeleccionado = null; // {fecha, dia, bloque}
+let seleccion = new Map(); // clave "FechaISO-Bloque" -> {fecha, dia, bloque, horaInicio, horaFin}
 let semanaSeleccionada = lunesDe(new Date()); // Date — lunes de la semana que se muestra
 
 function claveSlot(fechaISO, bloque){ return fechaISO + '-' + bloque; }
@@ -528,6 +555,14 @@ async function cargarReservas(){
     data.reservas.forEach(r => {
       reservas[claveSlot(r.fecha, r.bloque)] = { curso: r.curso, profesor: r.profesor, dia: r.dia };
     });
+    let seleccionCambio = false;
+    Array.from(seleccion.keys()).forEach(key => {
+      if (reservas[key]) { seleccion.delete(key); seleccionCambio = true; }
+    });
+    if (seleccionCambio) {
+      actualizarBarraSeleccion();
+      mostrarBanner('Una de tus horas seleccionadas ya fue reservada por otro profesor y se quitó de la selección.', true);
+    }
     dibujarTablero();
   } catch (err) {
     mostrarBanner('No se pudo cargar el horario. Revisa la conexión o la URL de la API. (' + err.message + ')', true);
@@ -561,14 +596,15 @@ function dibujarTablero(){
       const esAhora = (fechaISO === hoyISO && b.n === bloqueHoy);
       if (ocupado) {
         html += `<td>
-          <div class="cell taken ${esAhora ? 'now-col' : ''}" onclick="abrirLiberar('${fechaISO}', '${DIAS[i]}', ${b.n})">
+          <div class="cell taken ${esAhora ? 'now-col' : ''}" title="Reservado por ${escapeHtml(ocupado.profesor)}">
             <div class="curso">${escapeHtml(ocupado.curso)}</div>
             <div class="prof">${escapeHtml(ocupado.profesor)}</div>
           </div>
         </td>`;
       } else {
+        const marcado = seleccion.has(key);
         html += `<td>
-          <div class="cell ${esAhora ? 'now-col' : ''}" onclick="abrirReservar('${fechaISO}', '${DIAS[i]}', ${b.n})">
+          <div class="cell ${esAhora ? 'now-col' : ''} ${marcado ? 'selected' : ''}" onclick="toggleSeleccion('${fechaISO}', '${DIAS[i]}', ${b.n})">
             <div class="free-txt">Libre</div>
           </div>
         </td>`;
@@ -589,32 +625,54 @@ function escapeHtml(str){
 
 function bloqueInfo(n){ return BLOQUES.find(b => b.n === n); }
 
-function abrirReservar(fecha, dia, bloque){
-  slotSeleccionado = { fecha, dia, bloque };
-  const info = bloqueInfo(bloque);
-  document.getElementById('reservar-slot').textContent =
-    `${dia} ${fecha.split('-').reverse().slice(0,2).join('/')} · Bloque ${bloque} · ${info.inicio}–${info.fin}`;
+function toggleSeleccion(fechaISO, dia, bloque){
+  const key = claveSlot(fechaISO, bloque);
+  if (seleccion.has(key)) {
+    seleccion.delete(key);
+  } else {
+    const info = bloqueInfo(bloque);
+    seleccion.set(key, { fecha: fechaISO, dia, bloque, horaInicio: info.inicio, horaFin: info.fin });
+  }
+  dibujarTablero();
+  actualizarBarraSeleccion();
+}
+
+function limpiarSeleccion(){
+  seleccion.clear();
+  dibujarTablero();
+  actualizarBarraSeleccion();
+}
+
+function actualizarBarraSeleccion(){
+  const barra = document.getElementById('selection-bar');
+  const n = seleccion.size;
+  document.getElementById('selection-count').textContent =
+    n === 1 ? '1 hora seleccionada' : `${n} horas seleccionadas`;
+  barra.classList.toggle('show', n > 0);
+}
+
+function formatearFechaCorta(fechaISO){
+  const [y, m, d] = fechaISO.split('-');
+  return `${d}/${m}`;
+}
+
+function abrirReservar(){
+  if (seleccion.size === 0) return;
+
+  const lista = Array.from(seleccion.values())
+    .sort((a, b) => (a.fecha + a.bloque).localeCompare(b.fecha + b.bloque))
+    .map(s => `${s.dia} ${formatearFechaCorta(s.fecha)} · Bloque ${s.bloque} (${s.horaInicio}–${s.horaFin})`)
+    .join('<br>');
+
+  document.getElementById('reservar-slot').innerHTML = lista;
   document.getElementById('input-curso').value = '';
   document.getElementById('input-profesor-reserva').value = '';
   document.getElementById('error-reservar').className = 'modal-error';
   document.getElementById('overlay-reservar').classList.add('show');
 }
 
-function abrirLiberar(fecha, dia, bloque){
-  slotSeleccionado = { fecha, dia, bloque };
-  const info = bloqueInfo(bloque);
-  const r = reservas[claveSlot(fecha, bloque)];
-  document.getElementById('liberar-slot').textContent =
-    `${dia} ${fecha.split('-').reverse().slice(0,2).join('/')} · Bloque ${bloque} · ${info.inicio}–${info.fin} · Reservado por ${r.profesor} (${r.curso})`;
-  document.getElementById('input-profesor-liberar').value = '';
-  document.getElementById('error-liberar').className = 'modal-error';
-  document.getElementById('overlay-liberar').classList.add('show');
-}
-
 function cerrarModales(){
   document.getElementById('overlay-reservar').classList.remove('show');
-  document.getElementById('overlay-liberar').classList.remove('show');
-  slotSeleccionado = null;
 }
 
 async function enviarPost(payload){
@@ -637,14 +695,14 @@ async function confirmarReserva(){
     errorEl.className = 'modal-error show';
     return;
   }
+  if (seleccion.size === 0) {
+    errorEl.textContent = 'Selecciona al menos una hora en la grilla.';
+    errorEl.className = 'modal-error show';
+    return;
+  }
 
-  const info = bloqueInfo(slotSeleccionado.bloque);
   const payload = {
-    fecha: slotSeleccionado.fecha,
-    dia: slotSeleccionado.dia,
-    bloque: slotSeleccionado.bloque,
-    horaInicio: info.inicio,
-    horaFin: info.fin,
+    slots: Array.from(seleccion.values()),
     curso, profesor
   };
 
@@ -656,41 +714,9 @@ async function confirmarReserva(){
       return;
     }
     cerrarModales();
-    mostrarBanner('Hora reservada correctamente para ' + curso + '.', false);
-    cargarReservas();
-  } catch (err) {
-    errorEl.textContent = 'Error de conexión. Intenta de nuevo.';
-    errorEl.className = 'modal-error show';
-  }
-}
-
-async function confirmarCancelacion(){
-  const profesor = document.getElementById('input-profesor-liberar').value.trim();
-  const errorEl = document.getElementById('error-liberar');
-
-  if (!profesor) {
-    errorEl.textContent = 'Escribe tu nombre.';
-    errorEl.className = 'modal-error show';
-    return;
-  }
-
-  const payload = {
-    accion: 'cancelar',
-    fecha: slotSeleccionado.fecha,
-    dia: slotSeleccionado.dia,
-    bloque: slotSeleccionado.bloque,
-    profesor
-  };
-
-  try {
-    const data = await enviarPost(payload);
-    if (!data.ok) {
-      errorEl.textContent = data.error || 'No se pudo liberar la hora.';
-      errorEl.className = 'modal-error show';
-      return;
-    }
-    cerrarModales();
-    mostrarBanner('Hora liberada.', false);
+    seleccion.clear();
+    actualizarBarraSeleccion();
+    mostrarBanner('Reserva guardada correctamente para ' + curso + '.', false);
     cargarReservas();
   } catch (err) {
     errorEl.textContent = 'Error de conexión. Intenta de nuevo.';
