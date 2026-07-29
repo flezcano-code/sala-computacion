@@ -406,7 +406,7 @@
 
 <!-- Barra flotante de selección -->
 <div class="selection-bar" id="selection-bar">
-  <span id="selection-count">0 Bloques Seleccionados</span>
+  <span id="selection-count">0 horas seleccionadas</span>
   <div class="selection-bar-actions">
     <button class="btn btn-ghost" onclick="limpiarSeleccion()">Limpiar</button>
     <button class="btn btn-primary" onclick="abrirReservar()">Reservar seleccionadas</button>
@@ -441,7 +441,7 @@
 
 
 // Pega aquí la URL /exec que te entrega Apps Script al implementar Code.gs
-const API_URL = 'https://script.google.com/macros/s/AKfycbztMRpD4Z4iiZDBCE9J_94uTXqvUd_wqupDVa44fPZ7zT1PaewKnjXTusL1KdA1soxmXA/exec';
+const API_URL = 'PEGA_AQUI_TU_URL_DE_APPS_SCRIPT';
 
 const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 
@@ -647,7 +647,7 @@ function actualizarBarraSeleccion(){
   const barra = document.getElementById('selection-bar');
   const n = seleccion.size;
   document.getElementById('selection-count').textContent =
-    n === 1 ? '1 Bloque Seleccionado' : `${n} Bloques Seleccionados`;
+    n === 1 ? '1 hora seleccionada' : `${n} horas seleccionadas`;
   barra.classList.toggle('show', n > 0);
 }
 
@@ -735,4 +735,5 @@ setInterval(cargarReservas, 30000); // refresca cada 30s por si otro profe reser
 
 </body>
 </html>
+
 
