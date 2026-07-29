@@ -647,7 +647,7 @@ function actualizarBarraSeleccion(){
   const barra = document.getElementById('selection-bar');
   const n = seleccion.size;
   document.getElementById('selection-count').textContent =
-    n === 1 ? '1 hora seleccionada' : `${n} Bloques Seleccionados`;
+    n === 1 ? '1 bloque seleccionado' : `${n} Bloques Seleccionados`;
   barra.classList.toggle('show', n > 0);
 }
 
