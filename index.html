@@ -406,7 +406,7 @@
 
 <!-- Barra flotante de selección -->
 <div class="selection-bar" id="selection-bar">
-  <span id="selection-count">0 bloques seleccionados</span>
+  <span id="selection-count">0 Bloques Seleccionados</span>
   <div class="selection-bar-actions">
     <button class="btn btn-ghost" onclick="limpiarSeleccion()">Limpiar</button>
     <button class="btn btn-primary" onclick="abrirReservar()">Reservar seleccionadas</button>
@@ -647,7 +647,7 @@ function actualizarBarraSeleccion(){
   const barra = document.getElementById('selection-bar');
   const n = seleccion.size;
   document.getElementById('selection-count').textContent =
-    n === 1 ? '1 bloque seleccionado' : `${n} Bloques Seleccionados`;
+    n === 1 ? '1 Bloque Seleccionado' : `${n} Bloques Seleccionados`;
   barra.classList.toggle('show', n > 0);
 }
 
