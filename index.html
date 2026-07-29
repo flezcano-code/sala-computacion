@@ -660,7 +660,7 @@ function abrirReservar(){
   if (seleccion.size === 0) return;
 
   const lista = Array.from(seleccion.values())
-    .sort((a, b) => (a.fecha + a.bloque).localeCompare(b.fecha + b.bloque))
+    .sort((a, b) => (a.fecha + a.horaInicio).localeCompare(b.fecha + b.horaInicio))
     .map(s => `${s.dia} ${formatearFechaCorta(s.fecha)} · Bloque ${s.bloque} (${s.horaInicio}–${s.horaFin})`)
     .join('<br>');
 
@@ -735,5 +735,4 @@ setInterval(cargarReservas, 30000); // refresca cada 30s por si otro profe reser
 
 </body>
 </html>
-
 
